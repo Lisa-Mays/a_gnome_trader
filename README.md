@@ -6,6 +6,8 @@ A Discord bot for EverQuest TLP servers that watches the Frostreaver auction fee
 
 I run and test this on my Mac Studio, so any feedback on how the Windows or Linux version works would be great!
 
+Keep in mind that if you run the Windows version, the bot goes down and stops alerting whenever you close its window. It is really best run on a dedicated server or an always-on machine.
+
 ![A sale alert](docs/sale-alert-example.png)
 
 Green means it's priced below the 7-day average. Red means it's not.
