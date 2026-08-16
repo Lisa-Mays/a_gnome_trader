@@ -40,7 +40,7 @@ The confirmation shows stats, current averages, and the last sale:
 
 Notifications can be public in a channel or a private DM if it's in a shared discord and you want to keep your item hunting private.
 
-## Setup (about 5 minutes)
+## Setup
 
 1. Create an application at https://discord.com/developers/applications -> **Bot** -> **Reset Token** (no privileged intents needed).
 2. **OAuth2 -> URL Generator**: scopes `bot` + `applications.commands`, permissions `Send Messages` + `Embed Links`. Open the URL and invite the bot. (You need the Manage Server permission in the Discord server to add a bot.)
@@ -65,6 +65,8 @@ Config values (all optional except the token):
 - Watch the log: `tail -f /opt/a_gnome_trader/bot.log`
 - Stop: `sudo launchctl bootout system/com.agnometrader.bot`
 - Start again: `sudo launchctl bootstrap system /Library/LaunchDaemons/com.agnometrader.bot.plist`
+
+The binaries are unsigned, so macOS quarantines them when downloaded and refuses to run them ("cannot be opened because the developer cannot be verified"). `setup-mac.sh` clears this automatically; if you run the binary by hand instead, clear it yourself with `xattr -d com.apple.quarantine ./a_gnome_trader-darwin-arm64` or approve it under **System Settings -> Privacy & Security -> Open Anyway**.
 
 **Linux** - copy the linux binary, `config.json`, and `itemdb/` to `/opt/a_gnome_trader/`, create the service user (`sudo useradd -r agnome && sudo chown -R agnome /opt/a_gnome_trader`), install `deploy/a_gnome_trader.service` into systemd, then `sudo systemctl enable --now a_gnome_trader`.
 
