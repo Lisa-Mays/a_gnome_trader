@@ -1,0 +1,15 @@
+[Unit]
+Description=a_gnome_trader Discord bot (Frostreaver auction watch)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=agnome
+WorkingDirectory=/opt/a_gnome_trader
+ExecStart=/opt/a_gnome_trader/a_gnome_trader
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

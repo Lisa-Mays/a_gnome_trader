@@ -1,0 +1,12 @@
+{
+  "discordToken": "PASTE_YOUR_BOT_TOKEN_HERE",
+  "alertChannelId": "",
+  "ownerUserId": "",
+  "pollSeconds": 60,
+  "staleAlertMinutes": 15,
+  "repingHours": 4,
+  "dailyBonusChannelId": "",
+  "bonusBoardRefreshMinutes": 60,
+  "dailyPostHour": 3,
+  "dailyPostMinute": 10
+}

@@ -1,0 +1,25 @@
+# === Secrets — never commit (real bot token lives here) ===
+config.json
+
+# === Runtime state & logs (contain user IDs / feed cursor; regenerate themselves) ===
+watches.json
+bonuswatches.json
+state.json
+*.log
+*.log.old
+stop.flag
+bulk_cursors.json
+*.tmp
+
+# === OS junk ===
+.DS_Store
+
+# === Build output — distribute via GitHub Releases, not git ===
+/a_gnome_trader
+/a_gnome_trader.exe
+/dist/
+*.tgz
+
+# === Local cleanup / backup staging (not part of the repo) ===
+_to_delete_*/
+itemdb/_pre-merge-backup_*/
