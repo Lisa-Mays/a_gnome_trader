@@ -65,13 +65,13 @@ Config values (all optional except the token):
 
 The exe is unsigned, so the first launch of a downloaded copy triggers a SmartScreen warning ("Windows protected your PC"). Click **More info**, then **Run anyway**. This appears once per download and is expected for small unsigned programs.
 
-**macOS**: copy the `deploy/` folder to the Mac, put the darwin binary, your `config.json`, and `itemdb/` inside it, then from that folder run `sudo bash setup-mac.sh`. It detects the chip, installs to `/opt/a_gnome_trader`, and registers a LaunchDaemon (`com.agnometrader.bot`) that starts the bot at every boot and auto-restarts it if it ever crashes. To manage it:
+**macOS**: copy the `deploy/` folder to the Mac, put the macos binary for your chip, your `config.json`, and `itemdb/` inside it, then from that folder run `sudo bash setup-mac.sh`. It detects the chip, installs to `/opt/a_gnome_trader`, and registers a LaunchDaemon (`com.agnometrader.bot`) that starts the bot at every boot and auto-restarts it if it ever crashes. To manage it:
 
 - Watch the log: `tail -f /opt/a_gnome_trader/bot.log`
 - Stop: `sudo launchctl bootout system/com.agnometrader.bot`
 - Start again: `sudo launchctl bootstrap system /Library/LaunchDaemons/com.agnometrader.bot.plist`
 
-The binaries are unsigned, so macOS quarantines them when downloaded and refuses to run them ("cannot be opened because the developer cannot be verified"). `setup-mac.sh` clears this automatically; if you run the binary by hand instead, clear it yourself with `xattr -d com.apple.quarantine ./a_gnome_trader-darwin-arm64` or approve it under **System Settings > Privacy & Security > Open Anyway**.
+The binaries are unsigned, so macOS quarantines them when downloaded and refuses to run them ("cannot be opened because the developer cannot be verified"). `setup-mac.sh` clears this automatically; if you run the binary by hand instead, clear it yourself with `xattr -d com.apple.quarantine ./a_gnome_trader-macos-arm64` or approve it under **System Settings > Privacy & Security > Open Anyway**.
 
 **Linux**: copy the linux binary, `config.json`, and `itemdb/` to `/opt/a_gnome_trader/`, create the service user (`sudo useradd -r agnome && sudo chown -R agnome /opt/a_gnome_trader`), install `deploy/a_gnome_trader.service` into systemd, then `sudo systemctl enable --now a_gnome_trader`.
 
