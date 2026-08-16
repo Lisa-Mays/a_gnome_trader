@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -91,7 +92,17 @@ func runSetup(dir string) (Config, bool) {
 	fmt.Println("  1. A Discord account.")
 	fmt.Println("  2. Permission to add a bot to the server where alerts should go.")
 	fmt.Println()
-	if !askYN("Start setup now?", true) {
+	if runtime.GOOS == "linux" {
+		fmt.Println("Prefer a point-and-click setup? Type w to open it in a browser.")
+		fmt.Println("Prefer no wizard at all? Copy config.example.json to config.json and edit it.")
+		a := ask("Press Enter to continue here, or w for the browser setup: ")
+		if strings.EqualFold(a, "w") {
+			if cfg2, ok, fell := runWebSetup(dir); !fell {
+				return cfg2, ok
+			}
+			fmt.Println("Could not open a browser; continuing here.")
+		}
+	} else if !askYN("Start setup now?", true) {
 		fmt.Println("Setup cancelled. Run this program again any time to restart it.")
 		waitForEnter()
 		return cfg, false
@@ -199,6 +210,11 @@ func runSetup(dir string) (Config, bool) {
 	fmt.Println()
 	fmt.Println("Bonus board: a channel where the bot maintains a daily zone bonus board.")
 	cfg.DailyBonusChannelID = askID("Bonus board channel ID (Enter to skip): ")
+	fmt.Println()
+	fmt.Println("Status message: the small line under the bot's name in the member list.")
+	if st := ask(fmt.Sprintf("Status message [%s]: ", cfg.StatusText)); st != "" {
+		cfg.StatusText = st
+	}
 
 	// Step 5: item database.
 	fmt.Println()

@@ -63,6 +63,8 @@ Config values (all optional except the token):
 
 **Windows**: run it from a script or the exe directly. `run_hidden.vbs` runs it invisibly (recommended; `stop_bot.bat` stops it), `start_bot.bat` runs it in a console with auto-restart, or just double-click `a_gnome_trader.exe`. For start-at-boot, drop a shortcut to `run_hidden.vbs` in `shell:startup`.
 
+The exe is unsigned, so the first launch of a downloaded copy triggers a SmartScreen warning ("Windows protected your PC"). Click **More info**, then **Run anyway**. This appears once per download and is expected for small unsigned programs.
+
 **macOS**: copy the `deploy/` folder to the Mac, put the darwin binary, your `config.json`, and `itemdb/` inside it, then from that folder run `sudo bash setup-mac.sh`. It detects the chip, installs to `/opt/a_gnome_trader`, and registers a LaunchDaemon (`com.agnometrader.bot`) that starts the bot at every boot and auto-restarts it if it ever crashes. To manage it:
 
 - Watch the log: `tail -f /opt/a_gnome_trader/bot.log`

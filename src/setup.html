@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>a_gnome_trader setup</title>
+<style>
+  :root {
+    --bg: #1e1f22;
+    --panel: #2b2d31;
+    --panel2: #313338;
+    --input: #1e1f22;
+    --border: #3f4147;
+    --text: #dbdee1;
+    --muted: #949ba4;
+    --accent: #5865f2;
+    --accent-hover: #4752c4;
+    --green: #23a55a;
+    --red: #f23f43;
+    --yellow: #f0b232;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "gg sans", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .app { width: 100%; max-width: 640px; }
+  .brand {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .brand h1 { font-size: 22px; font-weight: 700; }
+  .brand p { color: var(--muted); font-size: 14px; margin-top: 4px; }
+  .progress {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 20px;
+  }
+  .progress span {
+    flex: 1;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    transition: background .3s;
+  }
+  .progress span.on { background: var(--accent); }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.35);
+  }
+  .step { display: none; animation: fade .25s ease; }
+  .step.active { display: block; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  h2 { font-size: 19px; margin-bottom: 6px; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 18px; line-height: 1.5; }
+  ol.guide { margin: 0 0 18px 20px; font-size: 14px; line-height: 1.9; }
+  ol.guide a { color: #00a8fc; text-decoration: none; }
+  ol.guide a:hover { text-decoration: underline; }
+  label { display: block; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .02em; margin: 14px 0 6px; }
+  input[type=text], input[type=password] {
+    width: 100%;
+    background: var(--input);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 15px;
+    padding: 11px 12px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  input:focus { border-color: var(--accent); }
+  .row { display: flex; gap: 10px; align-items: center; }
+  .row input { flex: 1; }
+  .btns { display: flex; justify-content: space-between; margin-top: 24px; }
+  button {
+    background: var(--accent);
+    color: #fff;
+    border: 0;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 11px 22px;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  button:hover { background: var(--accent-hover); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.ghost { background: transparent; color: var(--muted); }
+  button.ghost:hover { color: var(--text); background: rgba(255,255,255,.04); }
+  .note { font-size: 13px; color: var(--muted); margin-top: 12px; line-height: 1.5; }
+  .ok { color: var(--green); font-size: 14px; margin-top: 10px; display: none; }
+  .err { color: var(--red); font-size: 14px; margin-top: 10px; display: none; white-space: pre-wrap; }
+  .warn { color: var(--yellow); font-size: 14px; margin-top: 10px; display: none; }
+  .perm { display: inline-block; background: var(--panel2); border: 1px solid var(--border); border-radius: 6px; padding: 3px 10px; font-size: 13px; margin: 3px 4px 3px 0; }
+  .invitebox {
+    background: var(--input);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 13px;
+    word-break: break-all;
+    color: #00a8fc;
+    margin: 12px 0;
+  }
+  .spinner {
+    display: none;
+    width: 18px; height: 18px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  /* Discord member-list preview */
+  .preview {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 10px 12px;
+    width: 260px;
+    margin: 16px auto 6px;
+  }
+  .preview .grouphdr {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+    padding: 0 8px 6px;
+  }
+  .member {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 8px;
+    border-radius: 6px;
+  }
+  .member:hover { background: rgba(255,255,255,.04); }
+  .avwrap { position: relative; width: 34px; height: 34px; flex: none; }
+  .avwrap img {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: block;
+  }
+  .dot {
+    position: absolute;
+    right: -2px; bottom: -2px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--green);
+    border: 3px solid var(--panel2);
+  }
+  .mname { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .mname .nm {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .badge {
+    background: var(--accent);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 4px;
+    padding: 1px 5px;
+    flex: none;
+  }
+  .mstatus {
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mcol { min-width: 0; }
+  .check { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; font-size: 14px; }
+  .check input { margin-top: 3px; accent-color: var(--accent); }
+  .summary { font-size: 14px; line-height: 1.8; margin-top: 10px; }
+  .summary b { color: #fff; }
+  .center { text-align: center; }
+  .bigok {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: var(--green);
+    margin: 6px auto 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; color: #fff;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="brand">
+    <h1>a_gnome_trader</h1>
+    <p>Frostreaver auction alerts for your Discord server</p>
+  </div>
+  <div class="progress" id="prog"></div>
+  <div class="card">
+
+    <section class="step active" data-step="0">
+      <h2>Welcome</h2>
+      <p class="sub">This wizard sets the bot up in a few minutes. You will create a
+      Discord bot, invite it to your server, give it a name and status, and pick
+      where alerts go. Nothing is saved until the last step.</p>
+      <p class="sub">You will need a Discord account and permission to add a bot
+      to the server where alerts should go.</p>
+      <div class="btns"><span></span><button onclick="go(1)">Get started</button></div>
+    </section>
+
+    <section class="step" data-step="1">
+      <h2>Choose an install folder</h2>
+      <p class="sub">The bot keeps its settings, watch list, and logs next to its
+      program file. Leave the field unchanged to run from where it is now, or type
+      a different folder to copy everything there.</p>
+      <label>Install folder</label>
+      <input type="text" id="installPath" spellcheck="false">
+      <div class="err" id="installErr"></div>
+      <div class="btns">
+        <button class="ghost" onclick="go(0)">Back</button>
+        <div class="row"><div class="spinner" id="installSpin"></div>
+        <button id="installBtn" onclick="doInstall()">Continue</button></div>
+      </div>
+    </section>
+
+    <section class="step" data-step="2">
+      <h2>Create your bot and paste its token</h2>
+      <ol class="guide">
+        <li>Open <a href="https://discord.com/developers/applications" target="_blank" rel="noopener">discord.com/developers/applications</a></li>
+        <li>Click <b>New Application</b>, name it anything, click <b>Create</b></li>
+        <li>In the left menu click <b>Bot</b></li>
+        <li>Click <b>Reset Token</b>, confirm, then <b>Copy</b></li>
+      </ol>
+      <label>Bot token</label>
+      <input type="password" id="token" spellcheck="false" autocomplete="off" placeholder="Paste the token here">
+      <div class="ok" id="tokOk"></div>
+      <div class="err" id="tokErr"></div>
+      <p class="note">The token is like a password for your bot. It is saved only to
+      config.json on this computer and sent only to Discord.</p>
+      <div class="btns">
+        <button class="ghost" onclick="go(1)">Back</button>
+        <div class="row"><div class="spinner" id="tokSpin"></div>
+        <button id="tokBtn" onclick="doVerify()">Verify token</button></div>
+      </div>
+    </section>
+
+    <section class="step" data-step="3">
+      <h2>Invite the bot to your server</h2>
+      <p class="sub">Open the link below, pick your server, and click Authorize.
+      The link grants only what the bot needs:</p>
+      <div>
+        <span class="perm">View Channels</span><span class="perm">Send Messages</span><span class="perm">Embed Links</span><span class="perm">Attach Files</span>
+      </div>
+      <div class="invitebox"><a id="inviteLink" href="#" target="_blank" rel="noopener"></a></div>
+      <div class="btns">
+        <button class="ghost" onclick="go(2)">Back</button>
+        <button onclick="go(4)">I added it, continue</button>
+      </div>
+    </section>
+
+    <section class="step" data-step="4">
+      <h2>Name and status</h2>
+      <p class="sub">This is how the bot appears in your server's member list.
+      Edit the fields and the preview updates live.</p>
+      <div class="preview">
+        <div class="grouphdr">Online &mdash; 1</div>
+        <div class="member">
+          <div class="avwrap"><img id="pvAvatar" alt=""><span class="dot"></span></div>
+          <div class="mcol">
+            <div class="mname"><span class="nm" id="pvName"></span><span class="badge">APP</span></div>
+            <div class="mstatus" id="pvStatus"></div>
+          </div>
+        </div>
+      </div>
+      <label>Bot name</label>
+      <input type="text" id="botName" maxlength="32" spellcheck="false">
+      <label>Status message</label>
+      <input type="text" id="statusText" maxlength="128" spellcheck="false">
+      <div class="warn" id="idWarn"></div>
+      <p class="note">Renames are limited by Discord to two per hour. The status
+      appears once the bot is running.</p>
+      <div class="btns">
+        <button class="ghost" onclick="go(3)">Back</button>
+        <div class="row"><div class="spinner" id="idSpin"></div>
+        <button id="idBtn" onclick="doIdentity()">Continue</button></div>
+      </div>
+    </section>
+
+    <section class="step" data-step="5">
+      <h2>Where should alerts go?</h2>
+      <p class="sub">All of these are optional. To copy IDs, turn on Developer Mode
+      in Discord under User Settings &gt; Advanced, then right-click a channel or
+      user and pick Copy ID.</p>
+      <label>Alert channel ID</label>
+      <input type="text" id="alertChannel" spellcheck="false" placeholder="Warnings when the auction feed goes quiet">
+      <label>Your user ID</label>
+      <input type="text" id="ownerUser" spellcheck="false" placeholder="Lets those warnings reach you by DM">
+      <label>Bonus board channel ID</label>
+      <input type="text" id="bonusChannel" spellcheck="false" placeholder="Daily zone bonus board, leave empty for off">
+      <div class="check" id="itemdbRow" style="display:none">
+        <input type="checkbox" id="itemdbDl" checked>
+        <span>Download the item database (about 21 MB). Adds item stats and icons
+        to sale alerts. The bot works without it.</span>
+      </div>
+      <div class="err" id="finErr"></div>
+      <div class="btns">
+        <button class="ghost" onclick="go(4)">Back</button>
+        <div class="row"><div class="spinner" id="finSpin"></div>
+        <button id="finBtn" onclick="doFinish()">Finish setup</button></div>
+      </div>
+    </section>
+
+    <section class="step" data-step="6">
+      <div class="center">
+        <div class="bigok">&#10003;</div>
+        <h2>Setup complete</h2>
+      </div>
+      <div class="summary" id="doneSummary"></div>
+      <div class="warn" id="doneWarn"></div>
+      <p class="note center" id="doneNote"></p>
+    </section>
+
+  </div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const steps = 7;
+let cur = 0;
+let state = { verified: false, appId: "", installDir: "" };
+
+function renderProgress() {
+  const p = $("prog");
+  p.innerHTML = "";
+  for (let i = 0; i < steps; i++) {
+    const s = document.createElement("span");
+    if (i <= cur) s.className = "on";
+    p.appendChild(s);
+  }
+}
+function go(n) {
+  cur = n;
+  document.querySelectorAll(".step").forEach(el =>
+    el.classList.toggle("active", +el.dataset.step === n));
+  renderProgress();
+}
+async function api(path, body) {
+  const r = await fetch("api/" + path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body || {})
+  });
+  return r.json();
+}
+function busy(spin, btn, on) {
+  $(spin).style.display = on ? "block" : "none";
+  $(btn).disabled = on;
+}
+
+async function boot() {
+  renderProgress();
+  const st = await api("state");
+  $("installPath").value = st.dir;
+  state.installDir = st.dir;
+  $("botName").value = "Gnome Trader";
+  $("statusText").value = st.defaultStatus;
+  updatePreview();
+}
+
+async function doInstall() {
+  busy("installSpin", "installBtn", true);
+  $("installErr").style.display = "none";
+  const r = await api("install", { path: $("installPath").value.trim() });
+  busy("installSpin", "installBtn", false);
+  if (!r.ok) {
+    $("installErr").textContent = r.error;
+    $("installErr").style.display = "block";
+    return;
+  }
+  state.installDir = r.dir;
+  go(2);
+}
+
+async function doVerify() {
+  const tok = $("token").value.trim();
+  $("tokOk").style.display = "none";
+  $("tokErr").style.display = "none";
+  if (!tok) {
+    $("tokErr").textContent = "Paste the bot token first.";
+    $("tokErr").style.display = "block";
+    return;
+  }
+  busy("tokSpin", "tokBtn", true);
+  const r = await api("verify", { token: tok });
+  busy("tokSpin", "tokBtn", false);
+  if (!r.ok) {
+    $("tokErr").textContent = r.error + "\nDouble-check you copied the Bot token, not the Application ID or client secret.";
+    $("tokErr").style.display = "block";
+    return;
+  }
+  state.verified = true;
+  $("tokOk").textContent = "Token verified. Your bot is " + r.botName + ".";
+  $("tokOk").style.display = "block";
+  $("botName").value = r.botName;
+  if (r.avatarUrl) $("pvAvatar").src = r.avatarUrl;
+  $("inviteLink").textContent = r.inviteUrl;
+  $("inviteLink").href = r.inviteUrl;
+  updatePreview();
+  setTimeout(() => go(3), 600);
+}
+
+function updatePreview() {
+  $("pvName").textContent = $("botName").value || "Gnome Trader";
+  $("pvStatus").textContent = $("statusText").value || "";
+  if (!$("pvAvatar").src) {
+    $("pvAvatar").src = "https://cdn.discordapp.com/embed/avatars/0.png";
+  }
+}
+$("botName") && document.addEventListener("input", e => {
+  if (e.target.id === "botName" || e.target.id === "statusText") updatePreview();
+});
+
+async function doIdentity() {
+  busy("idSpin", "idBtn", true);
+  $("idWarn").style.display = "none";
+  const r = await api("identity", {
+    name: $("botName").value.trim(),
+    status: $("statusText").value.trim()
+  });
+  busy("idSpin", "idBtn", false);
+  if (r.warning) {
+    $("idWarn").textContent = r.warning;
+    $("idWarn").style.display = "block";
+  }
+  const st = await api("itemdbstatus");
+  $("itemdbRow").style.display = st.present ? "none" : "flex";
+  go(5);
+}
+
+async function doFinish() {
+  busy("finSpin", "finBtn", true);
+  $("finErr").style.display = "none";
+  const r = await api("finish", {
+    alertChannelId: $("alertChannel").value.trim(),
+    ownerUserId: $("ownerUser").value.trim(),
+    bonusChannelId: $("bonusChannel").value.trim(),
+    downloadItemdb: $("itemdbDl").checked && $("itemdbRow").style.display !== "none"
+  });
+  busy("finSpin", "finBtn", false);
+  if (!r.ok) {
+    $("finErr").textContent = r.error;
+    $("finErr").style.display = "block";
+    return;
+  }
+  $("doneSummary").innerHTML =
+    "Settings saved to <b>" + r.configPath + "</b>.<br>" +
+    "Type <b>/watch add</b> in your server to track an item, and <b>/help</b> for everything else.";
+  if (r.warnings && r.warnings.length) {
+    $("doneWarn").textContent = r.warnings.join("\n");
+    $("doneWarn").style.display = "block";
+  }
+  $("doneNote").textContent = r.installedElsewhere
+    ? "The bot was installed to " + r.installDir + " and is starting there now. You can close this tab and the old window."
+    : "The bot is starting now. You can close this tab; keep the bot window running.";
+  go(6);
+}
+
+boot();
+</script>
+</body>
+</html>

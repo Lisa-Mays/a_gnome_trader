@@ -11,7 +11,7 @@ import (
 
 func (b *Bot) onReady(s *discordgo.Session, r *discordgo.Ready) {
 	log.Printf("Logged in as %s#%s (%d guilds)", r.User.Username, r.User.Discriminator, len(r.Guilds))
-	_ = s.UpdateGameStatus(0, "Frostreaver auctions")
+	_ = s.UpdateGameStatus(0, b.cfg.StatusText)
 	b.validateChannel("alertChannelId", b.cfg.AlertChannelID)
 	b.validateChannel("dailyBonusChannelId", b.cfg.DailyBonusChannelID)
 }

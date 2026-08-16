@@ -5,6 +5,7 @@
   "pollSeconds": 60,
   "staleAlertMinutes": 15,
   "repingHours": 4,
+  "statusText": "Frostreaver auctions",
   "dailyBonusChannelId": "",
   "bonusBoardRefreshMinutes": 60,
   "dailyPostHour": 3,

@@ -23,6 +23,7 @@ type Config struct {
 	PollSeconds       int    `json:"pollSeconds"`       // default 60 (minimum 60); the bulk endpoint caches ~5min, polling each minute catches refreshes promptly
 	StaleAlertMinutes int    `json:"staleAlertMinutes"` // default 15; clamped to at least 3 poll intervals
 	RepingHours       int    `json:"repingHours"`       // same seller+price re-announce window, default 4
+	StatusText        string `json:"statusText"`        // presence line under the bot's name, default "Frostreaver auctions"
 
 	DailyBonusChannelID      string `json:"dailyBonusChannelId"`      // channel for the zone-bonus board ("" = off)
 	BonusBoardRefreshMinutes int    `json:"bonusBoardRefreshMinutes"` // how often the board re-syncs, default 60
@@ -54,7 +55,7 @@ type acEntry struct {
 }
 
 func defaultConfig() Config {
-	return Config{PollSeconds: 60, StaleAlertMinutes: 15, RepingHours: 4, BonusBoardRefreshMinutes: 60, DailyPostHour: 3, DailyPostMinute: 10}
+	return Config{PollSeconds: 60, StaleAlertMinutes: 15, RepingHours: 4, StatusText: "Frostreaver auctions", BonusBoardRefreshMinutes: 60, DailyPostHour: 3, DailyPostMinute: 10}
 }
 
 func loadConfig(path string) (Config, error) {
@@ -75,6 +76,9 @@ func loadConfig(path string) (Config, error) {
 	}
 	if cfg.RepingHours < 1 {
 		cfg.RepingHours = 4
+	}
+	if strings.TrimSpace(cfg.StatusText) == "" {
+		cfg.StatusText = "Frostreaver auctions"
 	}
 	if cfg.BonusBoardRefreshMinutes < 10 {
 		cfg.BonusBoardRefreshMinutes = 60
@@ -118,7 +122,7 @@ func main() {
 		return
 	}
 	if err != nil || cfg.DiscordToken == "" || strings.Contains(cfg.DiscordToken, "PASTE") {
-		c, cont := runSetup(dir)
+		c, cont := runSetupFlow(dir)
 		if !cont {
 			return
 		}
