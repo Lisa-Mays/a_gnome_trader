@@ -1,6 +1,6 @@
 # a_gnome_trader
 
-A Discord bot that watches the Frostreaver auction feed and pings you the moment an item you want goes up for sale - with the seller, the asking price, and whether it's a deal.
+A Discord bot for EverQuest that watches auction traffic on the Frostreaver TLP server and pings you the moment an item you want goes up for sale - with the seller, the asking price, and whether it's a deal.
 
 ![A sale alert](docs/sale-alert-example.png)
 
@@ -68,11 +68,11 @@ Binaries build from one codebase for Windows, macOS (Intel/Apple Silicon), and L
 
 ## Item stats and icons
 
-The included `itemdb/` folder gives every card its in-game tooltip (MAGIC/LORE/NO TRADE, slot, stats, resists, effects, class/race) plus the item icon - all read locally at startup, no network. The database currently covers Classic, Kunark, and Velious era items. If a record is ever wrong, drop a corrected one into `itemdb/overrides.json` (create it if needed) and restart; overrides win over the base data.
+The included `itemdb/` folder gives every card its in-game EverQuest tooltip (MAGIC/LORE/NO TRADE, slot, stats, resists, effects, class/race) plus the item icon - all read locally at startup, no network. The database currently covers Classic, Kunark, and Velious era items. If a record is ever wrong, drop a corrected one into `itemdb/overrides.json` (create it if needed) and restart; overrides win over the base data.
 
 ## Data source and fair use
 
-Auction data comes from the TLP Auctions API (araduneauctions.net), free for personal, non-commercial use under the PolyForm Noncommercial license. The bot uses the API's recommended bulk watchlist endpoints, honors rate limits, and checks watches once a minute - the site refreshes each item's data about every 5 minutes, so alerts typically land within 2-4 minutes of a listing. Zone bonuses come from frostreaver.zone. Do not use this bot or its data commercially.
+Auction data comes from the TLP Auctions API (araduneauctions.net), which tracks auctions on EverQuest Time-Locked Progression servers; it is free for personal, non-commercial use under the PolyForm Noncommercial license. The bot uses the API's recommended bulk watchlist endpoints, honors rate limits, and checks watches once a minute - the site refreshes each item's data about every 5 minutes, so alerts typically land within 2-4 minutes of a listing. Zone bonuses come from frostreaver.zone. Do not use this bot or its data commercially.
 
 ## License
 
