@@ -53,8 +53,12 @@ type acEntry struct {
 	at      time.Time
 }
 
+func defaultConfig() Config {
+	return Config{PollSeconds: 60, StaleAlertMinutes: 15, RepingHours: 4, BonusBoardRefreshMinutes: 60, DailyPostHour: 3, DailyPostMinute: 10}
+}
+
 func loadConfig(path string) (Config, error) {
-	cfg := Config{PollSeconds: 60, StaleAlertMinutes: 15, RepingHours: 4, BonusBoardRefreshMinutes: 60, DailyPostHour: 3, DailyPostMinute: 10}
+	cfg := defaultConfig()
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return cfg, err
@@ -107,16 +111,18 @@ func main() {
 
 	cfgPath := filepath.Join(dir, "config.json")
 	cfg, err := loadConfig(cfgPath)
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		log.Printf("ERROR: could not read config.json at %s: %v", cfgPath, err)
-		log.Printf("Copy config.example.json to config.json and paste your bot token in it.")
+		log.Printf("Fix or delete config.json and run the bot again; deleting it restarts first-time setup.")
 		waitForEnter()
 		return
 	}
-	if cfg.DiscordToken == "" || strings.Contains(cfg.DiscordToken, "PASTE") {
-		log.Printf("ERROR: discordToken is not set in config.json")
-		waitForEnter()
-		return
+	if err != nil || cfg.DiscordToken == "" || strings.Contains(cfg.DiscordToken, "PASTE") {
+		c, cont := runSetup(dir)
+		if !cont {
+			return
+		}
+		cfg = c
 	}
 
 	bot := &Bot{
@@ -132,7 +138,7 @@ func main() {
 		bot.itemdb = db
 		log.Printf("Item database loaded: %d items, %d icons", db.Count(), len(db.byIco))
 	} else {
-		log.Printf("WARN: item database not loaded (%v) - cards will omit item stats", err)
+		log.Printf("WARN: item database not loaded (%v), cards will omit item stats", err)
 	}
 
 	dg, err := discordgo.New("Bot " + cfg.DiscordToken)
