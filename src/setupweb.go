@@ -236,10 +236,11 @@ func (s *setupServer) hItemdbStatus(w http.ResponseWriter, r *http.Request) {
 
 func (s *setupServer) hFinish(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		AlertChannelID string `json:"alertChannelId"`
-		OwnerUserID    string `json:"ownerUserId"`
-		BonusChannelID string `json:"bonusChannelId"`
-		DownloadItemdb bool   `json:"downloadItemdb"`
+		AlertChannelID  string `json:"alertChannelId"`
+		OwnerUserID     string `json:"ownerUserId"`
+		BonusChannelID  string `json:"bonusChannelId"`
+		DownloadItemdb  bool   `json:"downloadItemdb"`
+		DesktopShortcut bool   `json:"desktopShortcut"`
 	}
 	if err := jsonIn(r, &in); err != nil {
 		jsonOut(w, map[string]any{"ok": false, "error": err.Error()})
@@ -291,26 +292,33 @@ func (s *setupServer) hFinish(w http.ResponseWriter, r *http.Request) {
 		jsonOut(w, map[string]any{"ok": false, "error": fmt.Sprintf("Could not write config.json: %v", err)})
 		return
 	}
-	installedElsewhere := s.installDir != s.dir
-	jsonOut(w, map[string]any{
-		"ok":                 true,
-		"configPath":         cfgPath,
-		"warnings":           warnings,
-		"installedElsewhere": installedElsewhere,
-		"installDir":         s.installDir,
-	})
-	if installedElsewhere {
-		exe := filepath.Join(s.installDir, filepath.Base(mustExePath()))
-		cmd := exec.Command(exe)
-		cmd.Dir = s.installDir
-		if err := cmd.Start(); err != nil {
-			fmt.Printf("Setup finished in %s but the installed copy could not be started: %v\n", s.installDir, err)
-			fmt.Println("Start it manually from the install folder.")
-		} else {
-			fmt.Println("Setup finished. The bot is now running from the install folder; this window can be closed.")
-		}
-		s.done <- setupResult{cfg, false}
-		return
+	exe := mustExePath()
+	if s.installDir != s.dir {
+		exe = filepath.Join(s.installDir, filepath.Base(exe))
 	}
-	s.done <- setupResult{cfg, true}
+	if in.DesktopShortcut {
+		if err := createDesktopShortcut(exe, s.installDir); err != nil {
+			warnings = append(warnings, fmt.Sprintf("Could not create the desktop shortcut (%v). You can make one yourself later.", err))
+		}
+	}
+	// Always hand off to a fresh copy in its own window, so the setup window
+	// can be closed without stopping the bot.
+	launched := true
+	if err := launchDetached(exe, s.installDir); err != nil {
+		launched = false
+		warnings = append(warnings, fmt.Sprintf("The bot could not be started automatically (%v). Start it by running %s.", err, exe))
+	}
+	jsonOut(w, map[string]any{
+		"ok":         true,
+		"configPath": cfgPath,
+		"warnings":   warnings,
+		"launched":   launched,
+		"installDir": s.installDir,
+	})
+	if launched {
+		fmt.Println("Setup finished. The bot is now running in its own window; this setup window can be closed.")
+	} else {
+		fmt.Printf("Setup finished, but the bot could not be started automatically. Run %s yourself.\n", exe)
+	}
+	s.done <- setupResult{cfg, false}
 }

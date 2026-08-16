@@ -309,6 +309,10 @@
       <input type="text" id="ownerUser" spellcheck="false" placeholder="Lets those warnings reach you by DM">
       <label>Bonus board channel ID</label>
       <input type="text" id="bonusChannel" spellcheck="false" placeholder="Daily zone bonus board, leave empty for off">
+      <div class="check">
+        <input type="checkbox" id="deskShort" checked>
+        <span>Create a desktop shortcut to the bot.</span>
+      </div>
       <div class="check" id="itemdbRow" style="display:none">
         <input type="checkbox" id="itemdbDl" checked>
         <span>Download the item database (about 21 MB). Adds item stats and icons
@@ -455,7 +459,8 @@ async function doFinish() {
     alertChannelId: $("alertChannel").value.trim(),
     ownerUserId: $("ownerUser").value.trim(),
     bonusChannelId: $("bonusChannel").value.trim(),
-    downloadItemdb: $("itemdbDl").checked && $("itemdbRow").style.display !== "none"
+    downloadItemdb: $("itemdbDl").checked && $("itemdbRow").style.display !== "none",
+    desktopShortcut: $("deskShort").checked
   });
   busy("finSpin", "finBtn", false);
   if (!r.ok) {
@@ -470,9 +475,9 @@ async function doFinish() {
     $("doneWarn").textContent = r.warnings.join("\n");
     $("doneWarn").style.display = "block";
   }
-  $("doneNote").textContent = r.installedElsewhere
-    ? "The bot was installed to " + r.installDir + " and is starting there now. You can close this tab and the old window."
-    : "The bot is starting now. You can close this tab; keep the bot window running.";
+  $("doneNote").textContent = r.launched
+    ? "The bot is now running in its own window from " + r.installDir + ". You can close this tab and the setup window."
+    : "Start the bot yourself from " + r.installDir + ", then close this tab.";
   go(6);
 }
 

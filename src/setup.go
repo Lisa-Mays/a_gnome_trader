@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -246,6 +245,19 @@ func runSetup(dir string) (Config, bool) {
 		return cfg, false
 	}
 
+	finalExe := mustExePath()
+	if installDir != dir {
+		finalExe = filepath.Join(installDir, filepath.Base(finalExe))
+	}
+	fmt.Println()
+	if askYN("Create a desktop shortcut to the bot?", runtime.GOOS != "linux") {
+		if err := createDesktopShortcut(finalExe, installDir); err != nil {
+			fmt.Printf("Could not create the desktop shortcut: %v\n", err)
+		} else {
+			fmt.Println("Desktop shortcut created.")
+		}
+	}
+
 	fmt.Println()
 	fmt.Println("=====================================================")
 	fmt.Println("  Setup complete")
@@ -257,19 +269,14 @@ func runSetup(dir string) (Config, bool) {
 	fmt.Println()
 
 	if installDir != dir {
-		exe := filepath.Join(installDir, filepath.Base(mustExePath()))
 		if askYN("Start the installed copy now?", true) {
-			cmd := exec.Command(exe)
-			cmd.Dir = installDir
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			if err := cmd.Start(); err != nil {
-				fmt.Printf("Could not start %s: %v\n", exe, err)
+			if err := launchDetached(finalExe, installDir); err != nil {
+				fmt.Printf("Could not start %s: %v\n", finalExe, err)
 				fmt.Println("Start it manually from the install folder.")
 				waitForEnter()
 				return cfg, false
 			}
-			fmt.Println("Bot started from the install folder. This window can be closed.")
+			fmt.Println("The bot is now running in its own window; this setup window can be closed.")
 		} else {
 			fmt.Printf("Run the bot from %s when ready.\n", installDir)
 		}
