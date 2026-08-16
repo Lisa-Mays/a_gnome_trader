@@ -112,22 +112,13 @@ func formatBonusWatchLine(w BonusWatch) string {
 
 func (b *Bot) handleBonusWatchCommand(s *discordgo.Session, i *discordgo.InteractionCreate, sub *discordgo.ApplicationCommandInteractionDataOption, userID string) {
 	reply := func(msg string, ephemeral bool) {
-		data := &discordgo.InteractionResponseData{Content: msg, AllowedMentions: &discordgo.MessageAllowedMentions{}}
-		if ephemeral {
-			data.Flags = discordgo.MessageFlagsEphemeral
-		}
-		if err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: data,
-		}); err != nil {
-			log.Printf("WARN: bonuswatch reply failed (%s): %v", sub.Name, err)
-		}
+		respondText(s, i, msg, ephemeral, "/bonuswatch "+sub.Name)
 	}
 
 	switch sub.Name {
 	case "add":
 		m := optMap(sub.Options)
-		zone := b.canonicalZone(m["zone"].StringValue())
+		zone := b.canonicalZone(optString(m, "zone"))
 		if zone == "" {
 			reply("Unknown zone. Start typing and pick one of the suggestions.", true)
 			return
@@ -191,7 +182,11 @@ func (b *Bot) handleBonusWatchCommand(s *discordgo.Session, i *discordgo.Interac
 
 	case "remove":
 		m := optMap(sub.Options)
-		zone := strings.TrimSpace(m["zone"].StringValue())
+		zone := optString(m, "zone")
+		if zone == "" {
+			reply("Zone name cannot be empty.", true)
+			return
+		}
 		wasPrivate := false
 		for _, w := range b.store.UserBonusWatches(userID) {
 			if strings.EqualFold(strings.TrimSpace(w.Zone), zone) {

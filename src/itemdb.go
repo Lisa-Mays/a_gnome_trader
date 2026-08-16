@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
-// ItemRec mirrors the compact oc-itemdb record format (see itemdb/build-itemdb.mjs).
+// ItemRec mirrors the compact record format of itemdb/oc-itemdb-all.json.
 type ItemRec struct {
 	Name    string     `json:"n"`
 	Icon    int        `json:"ic"`
@@ -60,19 +62,13 @@ func LoadItemDB(dir string) (*ItemDB, error) {
 	if err := json.Unmarshal(raw, &wrapper); err != nil {
 		return nil, fmt.Errorf("oc-itemdb-all.json: %w", err)
 	}
-	// v1 data had classes misfiled into the races column (generator off-by-one);
-	// this bot only accepts the corrected v2 format. Migrate v1 files with
-	// itemdb/migrate-itemdb-v2.mjs.
+	// v1 data had classes misfiled into the races column (generator
+	// off-by-one); this bot only accepts the corrected v2 format.
 	if wrapper.Version < 2 {
-		return nil, fmt.Errorf("oc-itemdb-all.json is version %d; run migrate-itemdb-v2.mjs to upgrade it to v2", wrapper.Version)
+		return nil, fmt.Errorf("oc-itemdb-all.json is version %d; this bot requires the v2 format - use the copy shipped in this repository's itemdb folder", wrapper.Version)
 	}
 	db := &ItemDB{items: make(map[int64]*ItemRec, len(wrapper.Items)), byIco: map[string]*zip.File{}}
-	for k, v := range wrapper.Items {
-		var id int64
-		if _, err := fmt.Sscanf(k, "%d", &id); err == nil {
-			db.items[id] = v
-		}
-	}
+	db.addRecords(wrapper.Items, false)
 	// supplement.json: items backfilled from Magelo for traded items the base db
 	// never had (out-of-era drops, items absent from the P99 lists). Fill-only -
 	// the base db always wins - so it never overrides the era-accurate records.
@@ -80,21 +76,11 @@ func LoadItemDB(dir string) (*ItemDB, error) {
 		var sup struct {
 			Items map[string]*ItemRec `json:"items"`
 		}
+		// a corrupt optional file must not take down the whole item db
 		if err := json.Unmarshal(raw, &sup); err != nil {
-			return nil, fmt.Errorf("supplement.json: %w", err)
-		}
-		added := 0
-		for k, v := range sup.Items {
-			var id int64
-			if _, err := fmt.Sscanf(k, "%d", &id); err == nil {
-				if _, exists := db.items[id]; !exists {
-					db.items[id] = v
-					added++
-				}
-			}
-		}
-		if added > 0 {
-			fmt.Printf("itemdb: %d supplement record(s) added\n", added)
+			log.Printf("WARN: supplement.json is corrupt, skipping it: %v", err)
+		} else if added := db.addRecords(sup.Items, true); added > 0 {
+			log.Printf("itemdb: %d supplement record(s) added", added)
 		}
 	}
 	// overrides.json: hand-corrected records (same format) merged over the
@@ -102,23 +88,42 @@ func LoadItemDB(dir string) (*ItemDB, error) {
 	if raw, err := os.ReadFile(filepath.Join(dir, "overrides.json")); err == nil {
 		var ov map[string]*ItemRec
 		if err := json.Unmarshal(raw, &ov); err != nil {
-			return nil, fmt.Errorf("overrides.json: %w", err)
+			log.Printf("WARN: overrides.json is corrupt, skipping it: %v", err)
+		} else {
+			db.addRecords(ov, false)
+			log.Printf("itemdb: %d override record(s) applied", len(ov))
 		}
-		for k, v := range ov {
-			var id int64
-			if _, err := fmt.Sscanf(k, "%d", &id); err == nil {
-				db.items[id] = v
-			}
-		}
-		fmt.Printf("itemdb: %d override record(s) applied\n", len(ov))
 	}
 	if z, err := zip.OpenReader(filepath.Join(dir, "icons.zip")); err == nil {
 		db.icons = z
 		for _, f := range z.File {
 			db.byIco[f.Name] = f
 		}
+	} else {
+		log.Printf("WARN: icons.zip not loaded (%v) - cards will omit item icons", err)
 	}
 	return db, nil
+}
+
+// addRecords merges string-keyed records into the db, skipping non-numeric
+// keys. fillOnly leaves existing records untouched (used for supplements).
+// Returns the number of records actually added or replaced.
+func (db *ItemDB) addRecords(recs map[string]*ItemRec, fillOnly bool) int {
+	n := 0
+	for k, v := range recs {
+		id, err := strconv.ParseInt(k, 10, 64)
+		if err != nil {
+			continue
+		}
+		if fillOnly {
+			if _, exists := db.items[id]; exists {
+				continue
+			}
+		}
+		db.items[id] = v
+		n++
+	}
+	return n
 }
 
 func (db *ItemDB) Get(id int64) *ItemRec {

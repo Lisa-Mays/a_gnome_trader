@@ -4,12 +4,10 @@ import (
 	"testing"
 )
 
-func resetBulkState() {
-	bulkState.mu.Lock()
-	bulkState.cursors = map[int64]int64{}
-	bulkState.catalog = nil
-	bulkState.path = ""
-	bulkState.mu.Unlock()
+// testState returns poll state with no persistence path, so tests never
+// touch the filesystem.
+func testState() *bulkPollState {
+	return &bulkPollState{cursors: map[int64]int64{}}
 }
 
 func TestResolveWatchIDs(t *testing.T) {
@@ -33,19 +31,19 @@ func TestResolveWatchIDs(t *testing.T) {
 	}
 }
 
-func TestNewSalesFromBulkPrimesSilently(t *testing.T) {
-	resetBulkState()
+func TestNewSalesPrimesSilently(t *testing.T) {
+	st := testState()
 	id := int64(7)
 	first := []BulkRecentSalesItem{{ItemID: 7, Item: "Fungi Tunic", Sales: []SalesLog{
 		{ID: 100, ItemID: &id, Item: "Fungi Tunic", Auctioneer: "Bob", PlatPrice: 5000},
 		{ID: 90, ItemID: &id, Item: "Fungi Tunic", Auctioneer: "Alice", PlatPrice: 5200},
 	}}}
-	if got := newSalesFromBulk(first); len(got) != 0 {
+	if got := st.newSales(first); len(got) != 0 {
 		t.Fatalf("first sight must prime silently, got %d sales", len(got))
 	}
 
 	// same payload again: nothing new
-	if got := newSalesFromBulk(first); len(got) != 0 {
+	if got := st.newSales(first); len(got) != 0 {
 		t.Fatalf("unchanged payload must yield nothing, got %d", len(got))
 	}
 
@@ -54,17 +52,17 @@ func TestNewSalesFromBulkPrimesSilently(t *testing.T) {
 		{ID: 101, ItemID: &id, Item: "Fungi Tunic", Auctioneer: "Cleo", PlatPrice: 4800},
 		{ID: 100, ItemID: &id, Item: "Fungi Tunic", Auctioneer: "Bob", PlatPrice: 5000},
 	}}}
-	got := newSalesFromBulk(second)
+	got := st.newSales(second)
 	if len(got) != 1 || got[0].ID != 101 {
 		t.Fatalf("want only sale 101, got %+v", got)
 	}
 }
 
-func TestNewSalesFromBulkSkipsWTBAndEmptyItems(t *testing.T) {
-	resetBulkState()
+func TestNewSalesSkipsWTBAndEmptyItems(t *testing.T) {
+	st := testState()
 	id := int64(9)
 	// item with no sales at all primes at zero...
-	if got := newSalesFromBulk([]BulkRecentSalesItem{{ItemID: 9, Item: "Dark Reaver"}}); len(got) != 0 {
+	if got := st.newSales([]BulkRecentSalesItem{{ItemID: 9, Item: "Dark Reaver"}}); len(got) != 0 {
 		t.Fatalf("empty item must yield nothing, got %d", len(got))
 	}
 	// ...so its genuine first sale after priming DOES alert
@@ -72,7 +70,7 @@ func TestNewSalesFromBulkSkipsWTBAndEmptyItems(t *testing.T) {
 		{ID: 50, ItemID: &id, Item: "Dark Reaver", Auctioneer: "Vex", PlatPrice: 30000},
 		{ID: 51, ItemID: &id, Item: "Dark Reaver", Auctioneer: "Vex", PlatPrice: 0, TransactionType: true}, // WTB
 	}}}
-	got := newSalesFromBulk(next)
+	got := st.newSales(next)
 	if len(got) != 1 || got[0].ID != 50 {
 		t.Fatalf("want only WTS sale 50, got %+v", got)
 	}

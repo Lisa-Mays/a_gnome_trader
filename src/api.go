@@ -59,9 +59,14 @@ func (c *APIClient) doJSON(req *http.Request, out interface{}) error {
 		if resp.StatusCode == http.StatusTooManyRequests {
 			wait := 5 * time.Second
 			if ra := resp.Header.Get("Retry-After"); ra != "" {
-				if secs, perr := strconv.Atoi(ra); perr == nil {
+				if secs, perr := strconv.Atoi(ra); perr == nil && secs > 0 {
 					wait = time.Duration(secs) * time.Second
 				}
+			}
+			// A hostile or misconfigured Retry-After must not stall the poll
+			// loop for hours; honor it up to a sane ceiling.
+			if wait > time.Minute {
+				wait = time.Minute
 			}
 			io.Copy(io.Discard, resp.Body)
 			resp.Body.Close()

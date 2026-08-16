@@ -223,12 +223,7 @@ func (b *Bot) handleComponent(s *discordgo.Session, i *discordgo.InteractionCrea
 	parts := strings.SplitN(data.CustomID, "|", 3)
 	clickerID := interactionUserID(i)
 	reply := func(msg string) {
-		if err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{Content: msg, Flags: discordgo.MessageFlagsEphemeral},
-		}); err != nil {
-			log.Printf("WARN: component reply failed (%s): %v", parts[0], err)
-		}
+		respondText(s, i, msg, true, "component "+parts[0])
 	}
 
 	switch parts[0] {
@@ -375,6 +370,34 @@ func optMap(opts []*discordgo.ApplicationCommandInteractionDataOption) map[strin
 	return m
 }
 
+// optString safely reads a string option; a malformed interaction missing a
+// required option must not panic the handler.
+func optString(m map[string]*discordgo.ApplicationCommandInteractionDataOption, name string) string {
+	if o, ok := m[name]; ok {
+		return strings.TrimSpace(o.StringValue())
+	}
+	return ""
+}
+
+// respondText is the one place plain-text interaction replies are sent.
+// Mentions are always suppressed, so user/role text in the content never
+// pings anyone; logTag identifies the failing command in warnings.
+func respondText(s *discordgo.Session, i *discordgo.InteractionCreate, msg string, ephemeral bool, logTag string) {
+	data := &discordgo.InteractionResponseData{
+		Content:         msg,
+		AllowedMentions: &discordgo.MessageAllowedMentions{},
+	}
+	if ephemeral {
+		data.Flags = discordgo.MessageFlagsEphemeral
+	}
+	if err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: data,
+	}); err != nil {
+		log.Printf("WARN: %s reply failed: %v", logTag, err)
+	}
+}
+
 func (b *Bot) onInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	if i.Type == discordgo.InteractionMessageComponent {
 		b.handleComponent(s, i)
@@ -400,36 +423,23 @@ func (b *Bot) onInteraction(s *discordgo.Session, i *discordgo.InteractionCreate
 		return
 	}
 	userID := interactionUserID(i)
-	if data.Name == "bonuswatch" && len(data.Options) > 0 {
+	if data.Name == "bonuswatch" && len(data.Options) > 0 && userID != "" {
 		b.handleBonusWatchCommand(s, i, data.Options[0], userID)
 		return
 	}
-	if data.Name != "watch" || len(data.Options) == 0 {
+	if data.Name != "watch" || len(data.Options) == 0 || userID == "" {
 		return
 	}
 	sub := data.Options[0]
 
-	// public replies never ping anyone even if user/role text ends up in them
 	reply := func(msg string, ephemeral bool) {
-		data := &discordgo.InteractionResponseData{
-			Content:         msg,
-			AllowedMentions: &discordgo.MessageAllowedMentions{},
-		}
-		if ephemeral {
-			data.Flags = discordgo.MessageFlagsEphemeral
-		}
-		if err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: data,
-		}); err != nil {
-			log.Printf("WARN: interaction reply failed (/watch %s): %v", sub.Name, err)
-		}
+		respondText(s, i, msg, ephemeral, "/watch "+sub.Name)
 	}
 
 	switch sub.Name {
 	case "add":
 		m := optMap(sub.Options)
-		item := strings.TrimSpace(m["item"].StringValue())
+		item := optString(m, "item")
 		if item == "" {
 			reply("Item name cannot be empty.", true)
 			return
@@ -445,6 +455,9 @@ func (b *Bot) onInteraction(s *discordgo.Session, i *discordgo.InteractionCreate
 		maxPrice := 0.0
 		if o, ok := m["max_price"]; ok {
 			maxPrice = o.FloatValue()
+		}
+		if maxPrice < 0 {
+			maxPrice = 0 // negative cap means "no cap", not "never match"
 		}
 		private := false
 		if o, ok := m["private"]; ok {
@@ -507,7 +520,11 @@ func (b *Bot) onInteraction(s *discordgo.Session, i *discordgo.InteractionCreate
 
 	case "remove":
 		m := optMap(sub.Options)
-		item := strings.TrimSpace(m["item"].StringValue())
+		item := optString(m, "item")
+		if item == "" {
+			reply("Item name cannot be empty.", true)
+			return
+		}
 		wasPrivate := false
 		for _, w := range b.store.UserWatches(userID) {
 			if strings.EqualFold(strings.TrimSpace(w.Item), item) {
@@ -523,7 +540,11 @@ func (b *Bot) onInteraction(s *discordgo.Session, i *discordgo.InteractionCreate
 
 	case "pause", "resume":
 		m := optMap(sub.Options)
-		item := strings.TrimSpace(m["item"].StringValue())
+		item := optString(m, "item")
+		if item == "" {
+			reply("Item name cannot be empty.", true)
+			return
+		}
 		pausing := sub.Name == "pause"
 		isPrivate := false
 		found := false
@@ -682,18 +703,14 @@ func (b *Bot) handleHelpCommand(s *discordgo.Session, i *discordgo.InteractionCr
 }
 
 func (b *Bot) handleUpdateCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	// edits the deferred response so the "thinking..." placeholder resolves
 	ephemeral := func(msg string) {
-		_, _ = s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
-			Content: msg, Flags: discordgo.MessageFlagsEphemeral,
-		})
-	}
-	if b.cfg.DailyBonusChannelID == "" {
-		if err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{Content: "dailyBonusChannelId is not set in config.json, so there is no bonus board to refresh. Use /bonuses to view them here.", Flags: discordgo.MessageFlagsEphemeral},
-		}); err != nil {
+		if _, err := s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{Content: &msg}); err != nil {
 			log.Printf("WARN: /update reply failed: %v", err)
 		}
+	}
+	if b.cfg.DailyBonusChannelID == "" {
+		respondText(s, i, "dailyBonusChannelId is not set in config.json, so there is no bonus board to refresh. Use /bonuses to view them here.", true, "/update")
 		return
 	}
 	if err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -721,11 +738,13 @@ func (b *Bot) handleBonusesCommand(s *discordgo.Session, i *discordgo.Interactio
 	zones, err := b.api.FetchTodayBonuses()
 	if err != nil {
 		msg := "Could not fetch zone bonuses from frostreaver.zone: " + err.Error()
-		_, _ = s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{Content: msg})
+		if _, err := s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{Content: &msg}); err != nil {
+			log.Printf("WARN: /bonuses reply failed: %v", err)
+		}
 		return
 	}
 	embeds := capEmbeds(BuildBonusEmbeds(zones))
-	if _, err := s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{Embeds: embeds}); err != nil {
-		log.Printf("WARN: bonuses followup failed: %v", err)
+	if _, err := s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{Embeds: &embeds}); err != nil {
+		log.Printf("WARN: /bonuses reply failed: %v", err)
 	}
 }

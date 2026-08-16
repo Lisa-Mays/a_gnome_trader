@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -29,33 +28,32 @@ import (
 
 const catalogMaxAge = 55 * time.Minute // refresh just inside the server's 1h cache
 
+// bulkPollState is owned exclusively by the pollLoop goroutine; nothing else
+// reads or writes it, so it needs no locking.
 type bulkPollState struct {
-	mu       sync.Mutex
-	catalog  []CatalogEntry
-	loadedAt time.Time
-	cursors  map[int64]int64 // itemId -> newest announced/seen sale id
-	path     string          // cursor persistence file
+	catalog   []CatalogEntry
+	catalogAt time.Time
+	cursors   map[int64]int64 // itemId -> newest announced/seen sale id
+	path      string          // cursor persistence file, "" disables saving
 }
 
-var bulkState = &bulkPollState{cursors: map[int64]int64{}}
-
-func (st *bulkPollState) loadCursors(dir string) {
-	st.mu.Lock()
-	defer st.mu.Unlock()
-	st.path = filepath.Join(dir, "bulk_cursors.json")
+func newBulkPollState(dir string) *bulkPollState {
+	st := &bulkPollState{
+		cursors: map[int64]int64{},
+		path:    filepath.Join(dir, "bulk_cursors.json"),
+	}
 	b, err := os.ReadFile(st.path)
 	if err != nil {
-		return
+		return st // first run: no cursor file yet
 	}
-	m := map[int64]int64{}
-	if err := json.Unmarshal(b, &m); err != nil {
+	if err := json.Unmarshal(b, &st.cursors); err != nil {
 		log.Printf("WARN: %s is corrupt, cursors reset (first cycle re-primes silently): %v", st.path, err)
-		return
+		st.cursors = map[int64]int64{}
 	}
-	st.cursors = m
+	return st
 }
 
-func (st *bulkPollState) saveCursorsLocked() {
+func (st *bulkPollState) saveCursors() {
 	if st.path == "" {
 		return
 	}
@@ -66,12 +64,12 @@ func (st *bulkPollState) saveCursorsLocked() {
 }
 
 func (b *Bot) pollLoop() {
-	bulkState.loadCursors(exeDir())
+	st := newBulkPollState(exeDir())
 	t := time.NewTicker(time.Duration(b.cfg.PollSeconds) * time.Second)
 	defer t.Stop()
-	b.pollOnce()
+	b.pollOnce(st)
 	for range t.C {
-		b.pollOnce()
+		b.pollOnce(st)
 	}
 }
 
@@ -88,24 +86,18 @@ func (b *Bot) markData(err error) {
 
 // refreshCatalogIfStale keeps a local copy of the item catalog so watch
 // resolution needs no API search calls. Returns the current catalog.
-func (b *Bot) refreshCatalogIfStale() []CatalogEntry {
-	bulkState.mu.Lock()
-	fresh := time.Since(bulkState.loadedAt) < catalogMaxAge && len(bulkState.catalog) > 0
-	cat := bulkState.catalog
-	bulkState.mu.Unlock()
-	if fresh {
-		return cat
+func (b *Bot) refreshCatalogIfStale(st *bulkPollState) []CatalogEntry {
+	if time.Since(st.catalogAt) < catalogMaxAge && len(st.catalog) > 0 {
+		return st.catalog
 	}
 	entries, err := b.api.FetchCatalog()
 	b.markData(err)
 	if err != nil {
 		log.Printf("WARN: catalog refresh failed (keeping previous copy): %v", err)
-		return cat
+		return st.catalog
 	}
-	bulkState.mu.Lock()
-	bulkState.catalog = entries
-	bulkState.loadedAt = time.Now()
-	bulkState.mu.Unlock()
+	st.catalog = entries
+	st.catalogAt = time.Now()
 	return entries
 }
 
@@ -132,8 +124,8 @@ func resolveWatchIDs(watches []Watch, catalog []CatalogEntry) []int64 {
 	return ids
 }
 
-func (b *Bot) pollOnce() {
-	catalog := b.refreshCatalogIfStale()
+func (b *Bot) pollOnce(st *bulkPollState) {
+	catalog := b.refreshCatalogIfStale(st)
 	if len(catalog) == 0 {
 		return // catalog fetch failed and we have no previous copy
 	}
@@ -159,7 +151,7 @@ func (b *Bot) pollOnce() {
 			return
 		}
 		b.markData(nil)
-		fresh = append(fresh, newSalesFromBulk(items)...)
+		fresh = append(fresh, st.newSales(items)...)
 	}
 	if len(fresh) == 0 {
 		return
@@ -193,41 +185,39 @@ func (b *Bot) pollOnce() {
 	}
 }
 
-// newSalesFromBulk advances each item's cursor and returns only sales newer
-// than it. An item seen for the first time primes its cursor without
-// returning anything, so a fresh watch (or fresh install) never replays the
-// up-to-20 historical sales the bulk endpoint includes.
-func newSalesFromBulk(items []BulkRecentSalesItem) []SalesLog {
-	bulkState.mu.Lock()
-	defer bulkState.mu.Unlock()
+// newSales advances each item's cursor and returns only sales newer than it.
+// An item seen for the first time primes its cursor without returning
+// anything, so a fresh watch (or fresh install) never replays the up-to-20
+// historical sales the bulk endpoint includes.
+func (st *bulkPollState) newSales(items []BulkRecentSalesItem) []SalesLog {
 	var out []SalesLog
 	changed := false
 	for _, it := range items {
-		newest, seen := bulkState.cursors[it.ItemID]
+		newest, seen := st.cursors[it.ItemID]
 		primed := seen
 		for _, s := range it.Sales {
 			if s.TransactionType {
 				continue // defensive: WTB lines never alert
 			}
-			if primed && s.ID > bulkState.cursors[it.ItemID] && s.ID > 0 {
+			if primed && s.ID > st.cursors[it.ItemID] && s.ID > 0 {
 				out = append(out, s)
 			}
 			if s.ID > newest {
 				newest = s.ID
 			}
 		}
-		if newest > bulkState.cursors[it.ItemID] {
-			bulkState.cursors[it.ItemID] = newest
+		if newest > st.cursors[it.ItemID] {
+			st.cursors[it.ItemID] = newest
 			changed = true
 		}
 		if !seen && newest == 0 {
 			// no sales returned at all; mark the item as primed anyway
-			bulkState.cursors[it.ItemID] = 0
+			st.cursors[it.ItemID] = 0
 			changed = true
 		}
 	}
 	if changed {
-		bulkState.saveCursorsLocked()
+		st.saveCursors()
 	}
 	return dedupeByID(out)
 }

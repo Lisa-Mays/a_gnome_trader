@@ -69,7 +69,7 @@ func (b *Bot) snapshotForWatch(itemText string, exact bool) (itemSnapshot, bool)
 // leads with its stats block and icon.
 func (s itemSnapshot) card() *discordgo.MessageEmbed {
 	trend, color, hasTrend := trendVsWeek(s.D1, s.D7)
-	trendVal := "​"
+	trendVal := "\u200b" // zero-width space: Discord rejects empty field values
 	if hasTrend {
 		trendVal = trend
 	}

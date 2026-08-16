@@ -137,10 +137,12 @@ func (b *Bot) buildEmbed(w Watch, s SalesLog, histCache map[int64][]HistoryPoint
 	if hasComparison {
 		fields = append(fields, &discordgo.MessageEmbedField{Name: "vs 7-Day Avg", Value: vsNote, Inline: true})
 	} else {
-		fields = append(fields, &discordgo.MessageEmbedField{Name: "​", Value: "​", Inline: true})
+		// Discord requires non-empty field names/values; a zero-width
+		// space renders as a blank spacer cell.
+		fields = append(fields, &discordgo.MessageEmbedField{Name: "\u200b", Value: "\u200b", Inline: true})
 	}
 	fields = append(fields,
-		&discordgo.MessageEmbedField{Name: avgHeader(), Value: "​"},
+		&discordgo.MessageEmbedField{Name: avgHeader(), Value: "\u200b"},
 		&discordgo.MessageEmbedField{Name: "1 Day", Value: avgCell(d1), Inline: true},
 		&discordgo.MessageEmbedField{Name: "3 Day", Value: avgCell(d3), Inline: true},
 		&discordgo.MessageEmbedField{Name: "7 Day", Value: avgCell(d7), Inline: true},
