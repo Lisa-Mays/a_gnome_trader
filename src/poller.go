@@ -18,15 +18,58 @@ import (
 //     is refreshed hourly and watches are resolved against it locally -
 //     substring and exact matching happen client-side, no search calls.
 //  2. POST /api/sales/bulk (the documented tool/watchlist endpoint) is
-//     polled with the resolved item ids. Its per-item cache is ~5 minutes;
-//     a 60s poll catches each cache refresh within a minute of it landing,
-//     which is as close to real time as the endpoint's cache allows.
+//     polled with the resolved item ids, at most bulkMaxIDs per call. With
+//     more ids than fit one call, the id chunks ROTATE across ticks instead
+//     of all being sent every tick: each tick sends just enough chunks
+//     (capped at bulkMaxCallsPerTick, spaced bulkCallSpacing apart) that
+//     every item is revisited within about bulkRevisitTicks ticks. The
+//     endpoint's per-item cache is ~5 minutes, so revisiting an item every
+//     5 minutes sees every cache refresh; polling it more often than that
+//     returns the same cached answer and just burns requests. Capacity at
+//     the default 60s tick: 200 ids per call, 3 calls per tick, 5 tick
+//     revisit = 3000 items at full freshness, degrading to longer revisit
+//     intervals (never more requests) beyond that.
 //
 // A per-item sale-id cursor (bulk_cursors.json) makes alerting incremental:
 // an item's first appearance primes its cursor silently, so newly added
 // watches never replay old sales.
 
 const catalogMaxAge = 55 * time.Minute // refresh just inside the server's 1h cache
+
+const (
+	bulkRevisitTicks    = 5               // aim: every watched item polled within this many ticks
+	bulkMaxCallsPerTick = 3               // hard cap on bulk calls per tick; the API load ceiling
+	bulkCallSpacing     = 2 * time.Second // pause between calls inside one tick
+)
+
+// bulkCallsPerTick is how many chunk calls this tick needs so that every
+// chunk is visited within bulkRevisitTicks, capped at bulkMaxCallsPerTick.
+func bulkCallsPerTick(numChunks int) int {
+	if numChunks <= 0 {
+		return 0
+	}
+	calls := (numChunks + bulkRevisitTicks - 1) / bulkRevisitTicks
+	if calls < 1 {
+		calls = 1
+	}
+	if calls > bulkMaxCallsPerTick {
+		calls = bulkMaxCallsPerTick
+	}
+	return calls
+}
+
+// chunkIDs splits ids into slices of at most size ids each.
+func chunkIDs(ids []int64, size int) [][]int64 {
+	var out [][]int64
+	for start := 0; start < len(ids); start += size {
+		end := start + size
+		if end > len(ids) {
+			end = len(ids)
+		}
+		out = append(out, ids[start:end])
+	}
+	return out
+}
 
 // bulkPollState is owned exclusively by the pollLoop goroutine; nothing else
 // reads or writes it, so it needs no locking.
@@ -35,6 +78,7 @@ type bulkPollState struct {
 	catalogAt time.Time
 	cursors   map[int64]int64 // itemId -> newest announced/seen sale id
 	path      string          // cursor persistence file, "" disables saving
+	nextChunk int             // rotation position across id chunks
 }
 
 func newBulkPollState(dir string) *bulkPollState {
@@ -138,25 +182,30 @@ func (b *Bot) pollOnce(st *bulkPollState) {
 		return
 	}
 
+	chunks := chunkIDs(ids, bulkMaxIDs)
+	calls := bulkCallsPerTick(len(chunks))
 	var fresh []SalesLog
-	for start := 0; start < len(ids); start += bulkMaxIDs {
-		end := start + bulkMaxIDs
-		if end > len(ids) {
-			end = len(ids)
+	polled := 0
+	for i := 0; i < calls; i++ {
+		if i > 0 {
+			time.Sleep(bulkCallSpacing)
 		}
-		items, err := b.api.FetchBulkRecentSales(ids[start:end])
+		chunk := chunks[st.nextChunk%len(chunks)]
+		st.nextChunk = (st.nextChunk + 1) % len(chunks)
+		items, err := b.api.FetchBulkRecentSales(chunk)
 		if err != nil {
-			log.Printf("WARN: bulk sales poll failed (%d ids): %v", end-start, err)
+			log.Printf("WARN: bulk sales poll failed (%d ids): %v", len(chunk), err)
 			b.markData(err)
-			return
+			break // keep whatever earlier calls returned this tick
 		}
 		b.markData(nil)
+		polled += len(chunk)
 		fresh = append(fresh, st.newSales(items)...)
 	}
 	if len(fresh) == 0 {
 		return
 	}
-	log.Printf("Poll: %d new WTS lines across %d watched items", len(fresh), len(ids))
+	log.Printf("Poll: %d new WTS lines (%d of %d watched items this tick)", len(fresh), polled, len(ids))
 
 	histCache := map[int64][]HistoryPoint{} // one history fetch per item per cycle
 

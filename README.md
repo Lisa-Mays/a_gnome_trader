@@ -53,7 +53,7 @@ Notifications can be public in a channel or a private DM if it's in a shared dis
 Config values (all optional except the token):
 
 - `alertChannelId` / `ownerUserId`: where feed-down alerts go (channel and/or DM). To copy these ids, first turn on Discord's Developer Mode (**User Settings > Advanced > Developer Mode**). Then right-click the channel and pick **Copy Channel ID**, and right-click your own name in the member list and pick **Copy User ID**.
-- `pollSeconds`: how often watched items are checked (default 60, minimum 60)
+- `pollSeconds`: how often the bot polls (default 60, minimum 60). With very large watch lists the bot checks items in rotating batches, so each item refreshes within about 5 minutes rather than sending more requests.
 - `staleAlertMinutes`: feed-down alert threshold (default 15)
 - `repingHours`: same-seller-same-price quiet window (default 4)
 - `dailyBonusChannelId`: channel for the zone-bonus board (empty = off)
@@ -83,7 +83,7 @@ The included `itemdb/` folder gives every card its in-game EverQuest tooltip (MA
 
 ## Data source and fair use
 
-Auction data comes from the TLP Auctions API (araduneauctions.net), which tracks auctions on EverQuest Time-Locked Progression servers; it is free for personal, non-commercial use under the PolyForm Noncommercial license. The bot uses the API's recommended bulk watchlist endpoints, honors rate limits, and checks watches once a minute. The site refreshes each item's data about every 5 minutes, so alerts typically land within a few minutes of a listing. Zone bonuses come from frostreaver.zone. Do not use this bot or its data commercially.
+Auction data comes from the TLP Auctions API (araduneauctions.net), which tracks auctions on EverQuest Time-Locked Progression servers; it is free for personal, non-commercial use under the PolyForm Noncommercial license. The bot uses the API's recommended bulk watchlist endpoints, honors rate limits, and checks watched items in small rotating batches (at most a few requests per minute, no matter how many items are watched) so each item is refreshed about as often as the site's own 5 minute cache updates. Alerts typically land within a few minutes of a listing. Zone bonuses come from frostreaver.zone. Do not use this bot or its data commercially.
 
 ## License
 

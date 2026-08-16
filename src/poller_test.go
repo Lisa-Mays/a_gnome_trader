@@ -75,3 +75,48 @@ func TestNewSalesSkipsWTBAndEmptyItems(t *testing.T) {
 		t.Fatalf("want only WTS sale 50, got %+v", got)
 	}
 }
+
+func TestBulkCallsPerTick(t *testing.T) {
+	cases := map[int]int{0: 0, 1: 1, 4: 1, 5: 1, 6: 2, 10: 2, 11: 3, 15: 3, 16: 3, 100: 3}
+	for chunks, want := range cases {
+		if got := bulkCallsPerTick(chunks); got != want {
+			t.Errorf("bulkCallsPerTick(%d) = %d, want %d", chunks, got, want)
+		}
+	}
+}
+
+func TestChunkIDs(t *testing.T) {
+	ids := make([]int64, 450)
+	for i := range ids {
+		ids[i] = int64(i + 1)
+	}
+	chunks := chunkIDs(ids, 200)
+	if len(chunks) != 3 || len(chunks[0]) != 200 || len(chunks[1]) != 200 || len(chunks[2]) != 50 {
+		t.Fatalf("450 ids must chunk into 200/200/50, got %d chunks", len(chunks))
+	}
+	if chunkIDs(nil, 200) != nil {
+		t.Fatal("no ids must yield no chunks")
+	}
+	if got := chunkIDs(ids[:10], 200); len(got) != 1 || len(got[0]) != 10 {
+		t.Fatalf("10 ids must be a single chunk of 10, got %v", got)
+	}
+}
+
+// Every chunk must be visited within bulkRevisitTicks ticks, mirroring the
+// rotation arithmetic in pollOnce.
+func TestChunkRotationCoversAll(t *testing.T) {
+	for _, numChunks := range []int{1, 2, 5, 7, 10, 15} {
+		visited := map[int]bool{}
+		next := 0
+		calls := bulkCallsPerTick(numChunks)
+		for tick := 0; tick < bulkRevisitTicks; tick++ {
+			for i := 0; i < calls; i++ {
+				visited[next%numChunks] = true
+				next = (next + 1) % numChunks
+			}
+		}
+		if len(visited) != numChunks {
+			t.Errorf("%d chunks: only %d visited within %d ticks", numChunks, len(visited), bulkRevisitTicks)
+		}
+	}
+}
