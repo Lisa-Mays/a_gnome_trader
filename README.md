@@ -46,6 +46,7 @@ Notifications can be public in a channel or a private DM if it's in a shared dis
 2. Under **OAuth2 > URL Generator**: scopes `bot` + `applications.commands`, permissions `Send Messages` + `Embed Links`. Open the URL and invite the bot. (You need the Manage Server permission in the Discord server to add a bot.)
 3. Copy `config.example.json` to `config.json` and paste your token.
 4. Run it (see below).
+5. Once the bot is online, type `/help` in any channel it can see for the full command list and an explanation of how alerts work.
 
 Config values (all optional except the token):
 
