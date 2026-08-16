@@ -45,7 +45,7 @@ The confirmation shows stats, current averages, and the last sale:
 
 Config values (all optional except the token):
 
-- `alertChannelId` / `ownerUserId` - where feed-down alerts go (channel and/or DM)
+- `alertChannelId` / `ownerUserId` - where feed-down alerts go (channel and/or DM). To copy these ids, first turn on Discord's Developer Mode (**User Settings -> Advanced -> Developer Mode**). Then right-click the channel -> **Copy Channel ID**, and right-click your own name in the member list -> **Copy User ID**.
 - `pollSeconds` - how often watched items are checked (default 60, minimum 60)
 - `staleAlertMinutes` - feed-down alert threshold (default 15)
 - `repingHours` - same-seller-same-price quiet window (default 4)
