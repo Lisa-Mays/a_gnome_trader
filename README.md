@@ -9,8 +9,8 @@ Green means it's priced below the 7-day average. Red means it's not.
 ## What it does
 
 - **Item watches** - substring or exact match, optional max price, channel ping or DM, private watches that don't reveal what you're hunting
-- **Pings only when it matters** - a seller's first listing pings; the same seller re-pings only on a price change or after 4 hours, so channels stay quiet
-- **Price intel on every card** - 1/3/7-day sell averages, last sale, trend vs the weekly average, full item stats and icon
+- **Pings** - a seller's first listing pings; the same seller re-pings only on a price change or after 4 hours, so channels stay quiet
+- **Detailed info** - 1/3/7-day sell averages, last sale, trend vs the weekly average, full item stats and icon
 - **Zone-bonus board** - daily auto-posted board of Frostreaver zone bonuses, with `/bonuswatch` pings when your zone rolls the bonus you want
 
 ## Adding a watch
@@ -56,7 +56,7 @@ Config values (all optional except the token):
 
 **Windows** - run it from a script or the exe directly: `run_hidden.vbs` runs it invisibly (recommended; `stop_bot.bat` stops it), `start_bot.bat` runs it in a console with auto-restart, or just double-click `a_gnome_trader.exe`. For start-at-boot, drop a shortcut to `run_hidden.vbs` in `shell:startup`.
 
-**macOS** - copy the `deploy/` folder to the Mac, put the darwin binary, your `config.json`, and `itemdb/` inside it, then from that folder run `sudo bash setup-mac.sh`. It detects the chip, installs to `/opt/a_gnome_trader`, and registers a LaunchDaemon (`com.agnometrader.bot`) that starts the bot at every boot and auto-restarts it if it ever crashes - no manual babysitting. To manage it:
+**macOS** - copy the `deploy/` folder to the Mac, put the darwin binary, your `config.json`, and `itemdb/` inside it, then from that folder run `sudo bash setup-mac.sh`. It detects the chip, installs to `/opt/a_gnome_trader`, and registers a LaunchDaemon (`com.agnometrader.bot`) that starts the bot at every boot and auto-restarts it if it ever crashes. To manage it:
 
 - Watch the log: `tail -f /opt/a_gnome_trader/bot.log`
 - Stop: `sudo launchctl bootout system/com.agnometrader.bot`
