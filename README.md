@@ -1,3 +1,5 @@
+![a_gnome_trader online in Discord](docs/bot-presence.png)
+
 # a_gnome_trader
 
 A Discord bot for EverQuest TLP servers that watches the Frostreaver auction feed from [TLP Auctions](https://www.tlp-auctions.com/) and pings you the moment an item you want goes up for sale, showing the seller, the asking price, and whether it's a deal. Upcoming features will add other TLP servers, but for now it's just Frostreaver.
