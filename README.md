@@ -44,6 +44,16 @@ The confirmation shows stats, current averages, and the last sale:
 
 Notifications can be public in a channel or a private DM if it's in a shared discord and you want to keep your item hunting private.
 
+## Zone bonuses
+
+Set `dailyBonusChannelId` and the bot posts a board of the day's Frostreaver zone bonuses, then edits that same message every hour as more zones get confirmed. Confirmed zones are grouped by bonus type with their level ranges, unconfirmed zones sit at the bottom, and an "Updated" stamp shows how fresh the data is. Yesterday's board stays in the channel as a record.
+
+`/bonuswatch add zone:<name>` pings you when a zone you care about rolls a bonus you want, once per bonus per day, checked on every refresh. Here the board goes up first, then the ping for a watched zone right after it:
+
+![The zone-bonus board and a bonus watch ping](docs/bonus-board-example.png)
+
+Pick specific bonus types from the dropdown (Experience, Loot, Coin, Rare Spawn, Faction, Tradeskill, Respawn) or choose "Any bonus". `/bonuses` shows today's bonuses on demand without waiting for the board, and `/update` forces an immediate refresh.
+
 ## Setup
 
 1. Create an application at https://discord.com/developers/applications, then under **Bot** click **Reset Token** (no privileged intents needed).
