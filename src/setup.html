@@ -319,6 +319,22 @@
         <span>Download the item database (about 21 MB). Adds item stats and icons
         to sale alerts. The bot works without it.</span>
       </div>
+      <div id="autoRow" style="display:none">
+        <label>Starting the bot</label>
+        <div class="check">
+          <input type="radio" name="auto" id="autoLogin" value="login" checked>
+          <span>Start by itself when I log in, and restart after a crash.</span>
+        </div>
+        <div class="check">
+          <input type="radio" name="auto" value="boot">
+          <span>Start by itself when the Mac powers on, before anyone logs in,
+          and restart after a crash. Asks for an admin password.</span>
+        </div>
+        <div class="check">
+          <input type="radio" name="auto" value="">
+          <span>Only start when I run it myself.</span>
+        </div>
+      </div>
       <div class="err" id="finErr"></div>
       <div class="btns">
         <button class="ghost" onclick="go(4)">Back</button>
@@ -378,6 +394,8 @@ async function boot() {
   const st = await api("state");
   $("installPath").value = st.dir;
   state.installDir = st.dir;
+  state.os = st.os;
+  if (st.os === "darwin") $("autoRow").style.display = "block";
   $("botName").value = "Gnome Trader";
   $("statusText").value = st.defaultStatus;
   updatePreview();
@@ -461,7 +479,9 @@ async function doFinish() {
     ownerUserId: $("ownerUser").value.trim(),
     bonusChannelId: $("bonusChannel").value.trim(),
     downloadItemdb: $("itemdbDl").checked && $("itemdbRow").style.display !== "none",
-    desktopShortcut: $("deskShort").checked
+    desktopShortcut: $("deskShort").checked,
+    autostart: $("autoRow").style.display === "none" ? "" :
+      (document.querySelector("input[name=auto]:checked") || { value: "" }).value
   });
   busy("finSpin", "finBtn", false);
   if (!r.ok) {
@@ -476,7 +496,12 @@ async function doFinish() {
     $("doneWarn").textContent = r.warnings.join("\n");
     $("doneWarn").style.display = "block";
   }
-  $("doneNote").textContent = r.launched
+  $("doneNote").textContent =
+    r.autostart === "login"
+    ? "The bot is running in the background. It starts by itself when you log in and restarts after a crash. You can close this tab and the setup window."
+    : r.autostart === "boot"
+    ? "The bot is running in the background. It starts by itself when the Mac powers on and restarts after a crash. You can close this tab and the setup window."
+    : r.launched
     ? "The bot is now running in its own window from " + r.installDir + ". You can close this tab and the setup window."
     : "Start the bot yourself from " + r.installDir + ", then close this tab.";
   go(6);

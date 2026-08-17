@@ -140,6 +140,7 @@ func (s *setupServer) hState(w http.ResponseWriter, r *http.Request) {
 	jsonOut(w, map[string]any{
 		"dir":           s.dir,
 		"defaultStatus": s.statusText,
+		"os":            runtime.GOOS,
 	})
 }
 
@@ -241,6 +242,7 @@ func (s *setupServer) hFinish(w http.ResponseWriter, r *http.Request) {
 		BonusChannelID  string `json:"bonusChannelId"`
 		DownloadItemdb  bool   `json:"downloadItemdb"`
 		DesktopShortcut bool   `json:"desktopShortcut"`
+		Autostart       string `json:"autostart"` // "login", "boot", or "" for manual start
 	}
 	if err := jsonIn(r, &in); err != nil {
 		jsonOut(w, map[string]any{"ok": false, "error": err.Error()})
@@ -301,23 +303,44 @@ func (s *setupServer) hFinish(w http.ResponseWriter, r *http.Request) {
 			warnings = append(warnings, fmt.Sprintf("Could not create the desktop shortcut (%v). You can make one yourself later.", err))
 		}
 	}
-	// Always hand off to a fresh copy in its own window, so the setup window
-	// can be closed without stopping the bot.
+	// Set up automatic start when asked; loading the launchd job also starts
+	// the bot. Otherwise hand off to a fresh copy in its own window, so the
+	// setup window can be closed without stopping the bot.
+	autostart := ""
+	if autostartSupported() && (in.Autostart == "login" || in.Autostart == "boot") {
+		var err error
+		if in.Autostart == "login" {
+			err = installAutostartLogin(exe, s.installDir)
+		} else {
+			err = installAutostartBoot(exe, s.installDir)
+		}
+		if err != nil {
+			warnings = append(warnings, fmt.Sprintf("Automatic start could not be set up (%v). Starting the bot normally instead.", err))
+		} else {
+			autostart = in.Autostart
+		}
+	}
 	launched := true
-	if err := launchDetached(exe, s.installDir); err != nil {
-		launched = false
-		warnings = append(warnings, fmt.Sprintf("The bot could not be started automatically (%v). Start it by running %s.", err, exe))
+	if autostart == "" {
+		if err := launchDetached(exe, s.installDir); err != nil {
+			launched = false
+			warnings = append(warnings, fmt.Sprintf("The bot could not be started automatically (%v). Start it by running %s.", err, exe))
+		}
 	}
 	jsonOut(w, map[string]any{
 		"ok":         true,
 		"configPath": cfgPath,
 		"warnings":   warnings,
 		"launched":   launched,
+		"autostart":  autostart,
 		"installDir": s.installDir,
 	})
-	if launched {
+	switch {
+	case autostart != "":
+		fmt.Println("Setup finished. The bot is running in the background and starts by itself from now on.")
+	case launched:
 		fmt.Println("Setup finished. The bot is now running in its own window; this setup window can be closed.")
-	} else {
+	default:
 		fmt.Printf("Setup finished, but the bot could not be started automatically. Run %s yourself.\n", exe)
 	}
 	s.done <- setupResult{cfg, false}

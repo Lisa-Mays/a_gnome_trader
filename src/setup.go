@@ -258,6 +258,40 @@ func runSetup(dir string) (Config, bool) {
 		}
 	}
 
+	autostarted := ""
+	if autostartSupported() {
+		fmt.Println()
+		fmt.Println("How should the bot start from now on?")
+		fmt.Println("  1. By itself when you log in, restarting after any crash (recommended)")
+		fmt.Println("  2. By itself when the Mac powers on, before anyone logs in, restarting")
+		fmt.Println("     after any crash; installing this asks for an admin password")
+		fmt.Println("  3. Only when you start it yourself")
+		for {
+			var err error
+			switch ask("Choose 1, 2, or 3 [1]: ") {
+			case "", "1":
+				autostarted = "login"
+				err = installAutostartLogin(finalExe, installDir)
+			case "2":
+				autostarted = "boot"
+				err = installAutostartBoot(finalExe, installDir)
+			case "3":
+				autostarted = ""
+			default:
+				fmt.Println("Please answer 1, 2, or 3.")
+				continue
+			}
+			if err != nil {
+				fmt.Printf("Could not set that up: %v\n", err)
+				autostarted = ""
+				if askYN("Pick a different option?", true) {
+					continue
+				}
+			}
+			break
+		}
+	}
+
 	fmt.Println()
 	fmt.Println("=====================================================")
 	fmt.Println("  Setup complete")
@@ -267,6 +301,18 @@ func runSetup(dir string) (Config, bool) {
 	fmt.Println("Once the bot is running, type /watch add in your server to track an item,")
 	fmt.Println("and /help for everything else.")
 	fmt.Println()
+
+	if autostarted != "" {
+		when := "you log in"
+		if autostarted == "boot" {
+			when = "the Mac powers on"
+		}
+		fmt.Println("The bot is now running in the background. It starts by itself when")
+		fmt.Printf("%s and restarts after a crash.\n", when)
+		fmt.Printf("Watch its log any time with: tail -f %s\n", filepath.Join(installDir, "bot.log"))
+		waitForEnter()
+		return cfg, false
+	}
 
 	if installDir != dir {
 		if askYN("Start the installed copy now?", true) {
